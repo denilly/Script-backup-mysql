@@ -9,7 +9,7 @@
 # Projeto: https://github.com/denilly/Script-backup-mysql
 # Copyright (c) 2025 Denilly Carvalho do Carmo. Todos os direitos reservados.
 # Licença: GNU General Public License (GPL) versão 3
-# Versão: 1.3
+# Versão: 1.4
 #
 # NOTAS: Este script é fornecido "como está" e pode ser utilizado e modificado por terceiros,
 #        desde que os créditos ao autor sejam mantidos. Para uso em projetos, por favor, faça
@@ -52,8 +52,8 @@
 
 #  1. =============================== CONFIGURAÇÕES ===============================
 # Controle de versão
-REVISAO_SCRIPT="21/07/2025"
-VERSAO_SCRIPT="1.3"
+REVISAO_SCRIPT="01/2026"
+VERSAO_SCRIPT="1.4"
 LICENCA_GPL="GPL-3.0"
 
 # Credenciais e demais configurações do SGBD
@@ -440,8 +440,8 @@ criar_mycnf() {
 
   cat > "$SGBD_MY_CNF_TEMP" <<EOF
 [client]
-user=${user}
-password=${pwd}
+user="${user}"
+password="${pwd}"
 EOF
 
   chmod 600 "$SGBD_MY_CNF_TEMP"
@@ -638,7 +638,10 @@ executar_backup() {
     if [[ "$compactar" =~ ^(s|sim)$ ]]; then  # Realiza a compactação se especificada
       if testar_depend_compactacao; then  # Testa dependências para compactação tar e zstd
         log_info "Compactando backup em tar.zst..."
-        if tar -I 'zstd -T0 -$DEFAULT_COMPACTAR_NIVEL' -cf "$destino/$data_atual.tar.zst" -C "$destino" --remove-files "$data_atual"; then  # inicia a compactação
+        if set -o pipefail && \
+          tar -cf - -C "$destino" --remove-files "$data_atual" \
+          | zstd -q -T0 -"$DEFAULT_COMPACTAR_NIVEL" -o "$destino/$data_atual.tar.zst"
+        then
           log_success "Backup concluído e armazenado em: $COR_DESTAQUE1$destino/$data_atual.tar.zst$COR_RESET"
           backup_final="$data_atual.tar.zst"
         else
@@ -732,7 +735,10 @@ executar_backup_tabela() {
   if [[ "$compactar" =~ ^(s|sim)$ ]]; then
     if testar_depend_compactacao; then
       log_info "Compactando backup em tar.zst..."
-      if tar -I 'zstd -T0 -$DEFAULT_COMPACTAR_NIVEL' -cf "$destino/$data_atual.tar.zst" -C "$destino" --remove-files "$data_atual"; then
+      if set -o pipefail && \
+        tar -cf - -C "$destino" --remove-files "$data_atual" \
+        | zstd -q -T0 -"$DEFAULT_COMPACTAR_NIVEL" -o "$destino/$data_atual.tar.zst"
+      then
         log_success "Backup concluído e armazenado em: $COR_DESTAQUE1$destino/$data_atual.tar.zst$COR_RESET"
         backup_final="$data_atual.tar.zst"
       else
@@ -809,7 +815,10 @@ verificar_integridade_backup() {
     temp_dir="$(mktemp -d)"
     log_info "Descompactando em $temp_dir para verificação..."
 
-    if ! tar -I 'zstd -d' -xf $backup_final -C $temp_dir; then
+    if ! set -o pipefail || \
+      ! zstd -d -q -c "$backup_final" \
+      | tar -xf - -C "$temp_dir"
+    then
       log_error "Falha ao descompactar $backup"
       rm -rf "$temp_dir"
       return 1
@@ -841,7 +850,10 @@ verificar_integridade_backup() {
       temp_dir="$(mktemp -d)"
       log_info "Descompactando em $temp_dir para verificação..."
 
-      if ! tar -I 'zstd -d' -xf $tar_file -C $temp_dir; then
+      if ! set -o pipefail || \
+        ! zstd -d -q -c "$tar_file" \
+        | tar -xf - -C "$temp_dir"
+      then
         log_error "Falha ao descompactar $tar_file"
         rm -rf "$temp_dir"
         continue
