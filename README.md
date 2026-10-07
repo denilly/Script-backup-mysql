@@ -1,5 +1,3 @@
----
-
 # script-backup-mysql.sh
 
 ![Version](https://img.shields.io/badge/version-1.4-blue.svg)
